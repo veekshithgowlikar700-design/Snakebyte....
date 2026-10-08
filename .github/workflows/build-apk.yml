@@ -1,0 +1,70 @@
+name: Build Polytech Quest APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: write
+
+concurrency:
+  group: polytech-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+          cache-cleanup: on-success
+
+      - name: Check Gradle
+        run: gradle --version
+
+      - name: Build debug APK
+        run: gradle --no-daemon --stacktrace assembleDebug
+
+      - name: Rename APK
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk \
+            dist/PolytechQuest-v1-debug.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PolytechQuest-APK
+          path: dist/PolytechQuest-v1-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish to Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-build-${{ github.run_number }}
+          name: Polytech Quest APK build ${{ github.run_number }}
+          files: dist/PolytechQuest-v1-debug.apk
+          make_latest: true
+
+      - name: Build summary
+        run: |
+          echo "## Polytech Quest APK ready" >> "$GITHUB_STEP_SUMMARY"
+          echo "Download it from Artifacts or Releases." >> "$GITHUB_STEP_SUMMARY"
